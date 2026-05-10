@@ -14,7 +14,7 @@
 ---
 
 <p align="center">
-  <strong>A lightweight, Electron-based overlay browser for LLM integration</strong><br>
+  <strong>Overlay Browser : Your AI companion's second screen — instant, always-on-top, zero distraction.</strong><br>
   <em>Global Shortcuts | Floating UI | Profile Persistence | Cross-Platform | Easy to Extend</em>
 </p>
 
