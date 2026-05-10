@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https: data:;">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+    html, body { width: 64px; height: 64px; background: transparent; overflow: hidden; }
+
+    #wrap {
+      width: 56px; height: 56px; margin: 4px;
+      border-radius: 50%;
+      background: rgba(18, 18, 28, 0.90);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1.5px solid rgba(255,255,255,0.13);
+      box-shadow:
+        0 6px 28px rgba(0,0,0,0.65),
+        0 1px 0 rgba(255,255,255,0.07) inset;
+      display: flex; align-items: center; justify-content: center;
+      cursor: grab; transition: background 0.15s, box-shadow 0.15s;
+    }
+    #wrap.hover {
+      background: rgba(35, 40, 70, 0.95);
+      box-shadow:
+        0 6px 32px rgba(99,179,237,0.40),
+        0 1px 0 rgba(255,255,255,0.10) inset;
+      border-color: rgba(99,179,237,0.28);
+    }
+    #wrap.dragging { cursor: grabbing; }
+
+    #icon {
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+
+    /* Pulsing dot while dragging */
+    #wrap.dragging #icon { opacity: 0.6; }
+  </style>
+</head>
+<body>
+  <div id="wrap" title="Show Overlay (Win+O)">
+    <div id="icon">
+      <img src="./chaticon.svg" width="28" height="28" draggable="false">
+    </div>
+  </div>
+  <script src="float-renderer.js"></script>
+</body>
+</html>

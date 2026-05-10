@@ -1,0 +1,410 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data:;">
+  <title>Overlay Browser</title>
+  <style>
+    :root {
+      --bg-rgb: 20, 20, 22;
+      --bg-opacity: 0.72;
+      --bg-opacity-2: 0.60;
+      --blur: 18px;
+      --accent-rgb: 99, 179, 237;
+      --text-primary: #d0d8e4;
+      --text-secondary: rgba(255,255,255,0.45);
+      --text-muted: rgba(255,255,255,0.35);
+      --text-dim: rgba(255,255,255,0.4);
+      --text-hint: rgba(255,255,255,0.25);
+      --text-url: rgba(255,255,255,0.32);
+      --text-val: rgba(255,255,255,0.5);
+      --border: rgba(255,255,255,0.06);
+      --border-input: rgba(255,255,255,0.08);
+      --border-color-inp: rgba(255,255,255,0.10);
+      --shadow: rgba(2,6,23,0.7);
+      --settings-bg: rgba(14,14,18,0.97);
+      --item-bg: rgba(255,255,255,0.04);
+      --item-hover: rgba(255,255,255,0.08);
+      --input-bg: rgba(255,255,255,0.05);
+      --color-inp-bg: rgba(255,255,255,0.06);
+      --btn-color: #c8d4e0;
+      --btn-bg: rgba(255,255,255,0.05);
+      --btn-hover: rgba(255,255,255,0.11);
+      --del-color: rgba(255,255,255,0.25);
+    }
+
+    [data-theme="light"] {
+      --bg-rgb: 240, 242, 248;
+      --bg-opacity: 0.88;
+      --bg-opacity-2: 0.76;
+      --text-primary: #1a202c;
+      --text-secondary: rgba(0,0,0,0.55);
+      --text-muted: rgba(0,0,0,0.45);
+      --text-dim: rgba(0,0,0,0.5);
+      --text-hint: rgba(0,0,0,0.35);
+      --text-url: rgba(0,0,0,0.4);
+      --text-val: rgba(0,0,0,0.45);
+      --border: rgba(0,0,0,0.08);
+      --border-input: rgba(0,0,0,0.12);
+      --border-color-inp: rgba(0,0,0,0.15);
+      --shadow: rgba(0,0,0,0.18);
+      --settings-bg: rgba(235,238,245,0.98);
+      --item-bg: rgba(0,0,0,0.03);
+      --item-hover: rgba(0,0,0,0.07);
+      --input-bg: rgba(0,0,0,0.04);
+      --color-inp-bg: rgba(0,0,0,0.05);
+      --btn-color: #374151;
+      --btn-bg: rgba(0,0,0,0.05);
+      --btn-hover: rgba(0,0,0,0.10);
+      --del-color: rgba(0,0,0,0.25);
+    }
+
+    html, body { height: 100%; margin: 0; background: transparent; font-family: "Segoe UI", system-ui, Arial; font-size: 12px; color: var(--text-primary); }
+
+    #glass {
+      position: fixed; inset: 12px; padding: 6px;
+      background: linear-gradient(180deg,
+        rgba(var(--bg-rgb), var(--bg-opacity)),
+        rgba(var(--bg-rgb), var(--bg-opacity-2)));
+      backdrop-filter: blur(var(--blur)) saturate(160%) contrast(95%);
+      -webkit-backdrop-filter: blur(var(--blur)) saturate(160%) contrast(95%);
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 30px var(--shadow);
+      border-radius: 14px;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      display: flex; gap: 5px; align-items: center;
+      padding: 5px 6px; flex-shrink: 0; overflow: hidden;
+      -webkit-app-region: drag;
+    }
+    #toolbar > * { -webkit-app-region: no-drag; }
+
+    .btn {
+      height: 24px; padding: 0 8px;
+      border-radius: 7px; border: 0;
+      background: var(--btn-bg); color: var(--btn-color);
+      cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px; white-space: nowrap; transition: background 0.12s;
+      -webkit-app-region: no-drag;
+    }
+    .btn:hover { background: var(--btn-hover); }
+    .btn.icon { width: 24px; padding: 0; flex-shrink: 0; }
+
+    /* ── Webview wrapper ── */
+    #wv-wrap { flex: 1; position: relative; margin-top: 4px; }
+    webview { position: absolute; inset: 0; border: 0; border-radius: 10px; background: transparent; }
+
+    /* ── Settings panel (overlay over webview) ── */
+    #settings {
+      position: absolute; inset: 0; border-radius: 10px;
+      background: var(--settings-bg);
+      overflow-y: auto; padding: 14px 14px 20px;
+      display: none; flex-direction: column; gap: 18px;
+      z-index: 10;
+    }
+    #settings.open { display: flex; }
+
+    .s-section { display: flex; flex-direction: column; gap: 8px; }
+    .s-section h3 {
+      margin: 0 0 2px; font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    /* profile list */
+    #profile-list { display: flex; flex-direction: column; gap: 3px; }
+    .p-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 8px; border-radius: 7px;
+      background: var(--item-bg); cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .p-item:hover { background: var(--item-hover); }
+    .p-item.active { background: rgba(var(--accent-rgb), 0.12); border-color: rgba(var(--accent-rgb), 0.22); }
+    .p-item .p-name { font-size: 12px; color: var(--text-primary); flex-shrink: 0; min-width: 70px; }
+    .p-item .p-url  { font-size: 10px; color: var(--text-url); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .p-del { background: none; border: 0; color: var(--del-color); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
+    .p-del:hover { color: rgba(255,90,90,0.8); }
+
+    /* add profile form */
+    .add-form { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
+    .s-row { display: flex; gap: 6px; align-items: center; }
+    .s-row label { font-size: 11px; color: var(--text-dim); width: 52px; flex-shrink: 0; }
+
+    input.s-inp {
+      flex: 1; height: 24px; padding: 0 8px;
+      border-radius: 7px; border: 1px solid var(--border-input);
+      background: var(--input-bg); color: var(--text-primary);
+      font-size: 11px; outline: none;
+    }
+    input.s-inp:focus { border-color: rgba(var(--accent-rgb), 0.4); }
+    input.s-inp[type=number] { flex: none; width: 72px; }
+
+    .s-btn {
+      align-self: flex-start; height: 26px; padding: 0 12px;
+      border-radius: 7px; border: 0;
+      background: rgba(var(--accent-rgb), 0.18); color: rgba(var(--accent-rgb), 1);
+      cursor: pointer; font-size: 11px; transition: background 0.12s;
+    }
+    .s-btn:hover { background: rgba(var(--accent-rgb), 0.32); }
+
+    /* ── Appearance controls ── */
+    input[type=color].color-inp {
+      width: 40px; height: 24px; padding: 2px 3px;
+      border-radius: 7px; border: 1px solid var(--border-color-inp);
+      background: var(--color-inp-bg); cursor: pointer;
+    }
+    input[type=range].s-slider {
+      flex: 1; height: 4px; cursor: pointer;
+      accent-color: rgba(var(--accent-rgb), 0.9);
+    }
+    .val-lbl { font-size: 11px; color: var(--text-val); min-width: 36px; text-align: right; }
+
+    /* theme preview swatch */
+    #theme-preview {
+      height: 28px; border-radius: 7px; margin-top: 2px;
+      border: 1px solid var(--border-input);
+      transition: background 0.2s, backdrop-filter 0.2s;
+    }
+
+    .hint { font-size: 10px; color: var(--text-hint); line-height: 1.5; }
+    .s-divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+    /* shortcut recorder */
+    .shortcut-inp {
+      flex: 1; height: 24px; padding: 0 10px;
+      border-radius: 7px; border: 1px solid var(--border-input);
+      background: var(--input-bg); color: var(--text-primary);
+      font-size: 11px; font-family: monospace; outline: none;
+      display: flex; align-items: center; cursor: pointer; user-select: none;
+    }
+    .shortcut-inp:focus { border-color: rgba(var(--accent-rgb), 0.4); }
+    .shortcut-inp.recording {
+      border-color: rgba(var(--accent-rgb), 0.6);
+      background: rgba(var(--accent-rgb), 0.08);
+      color: rgba(var(--accent-rgb), 0.7);
+      font-style: italic;
+    }
+
+    /* preset chips */
+    .preset-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+    .preset-chip {
+      height: 22px; padding: 0 9px; border-radius: 11px;
+      border: 1px solid var(--border-input);
+      background: var(--item-bg); color: var(--text-primary);
+      cursor: pointer; font-size: 10px; transition: background 0.12s;
+    }
+    .preset-chip:hover { background: var(--item-hover); }
+    .preset-chip.exists { border-color: rgba(var(--accent-rgb), 0.4); color: rgba(var(--accent-rgb), 1); cursor: default; }
+
+    /* profile dropdown */
+    #profile-dropdown-wrap {
+      flex: 1; position: relative; min-width: 0; -webkit-app-region: no-drag;
+    }
+    #active-profile-name {
+      width: 100%; font-size: 11px; color: var(--text-secondary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      padding: 2px 16px 2px 4px; cursor: pointer; border-radius: 5px;
+      position: relative; display: block;
+      transition: background 0.12s;
+    }
+    #active-profile-name:hover { background: var(--btn-hover); }
+    #active-profile-name::after {
+      content: '▾'; position: absolute; right: 3px; top: 50%;
+      transform: translateY(-50%); font-size: 9px;
+      color: var(--text-hint); pointer-events: none;
+    }
+    #profile-dropdown {
+      display: none; position: absolute; top: calc(100% + 4px); left: 0;
+      min-width: 160px; max-width: 240px;
+      background: var(--settings-bg);
+      border: 1px solid var(--border-input);
+      border-radius: 9px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      z-index: 100; overflow: hidden;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    #profile-dropdown.open { display: block; }
+    .dd-item {
+      padding: 7px 12px; font-size: 11px; cursor: pointer;
+      color: var(--text-primary); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+      transition: background 0.1s;
+    }
+    .dd-item:hover { background: var(--item-hover); }
+    .dd-item.active { color: rgba(var(--accent-rgb), 1); background: rgba(var(--accent-rgb), 0.10); }
+  </style>
+</head>
+<body>
+  <div id="glass">
+    <div id="toolbar">
+      <img src="./chaticon.svg" width="18" height="18" draggable="false" style="opacity:0.75;flex-shrink:0;-webkit-app-region:no-drag;">
+      <div id="profile-dropdown-wrap">
+        <span id="active-profile-name">DeepSeek</span>
+        <div id="profile-dropdown"></div>
+      </div>
+      <button id="dock" class="btn icon" title="Toggle dock side">
+        <svg id="dock-icon" width="13" height="13" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="15" y1="3" x2="15" y2="21" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </button>
+      <button id="settings-btn" class="btn icon" title="Settings">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </button>
+      <button id="theme-toggle" class="btn icon" title="Toggle light/dark mode">
+        <svg id="theme-icon" width="13" height="13" viewBox="0 0 24 24" fill="none">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button id="hide" class="btn icon" title="Hide (Win+O)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+          <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button id="close-app" class="btn icon" title="Quit app" style="color:rgba(255,100,100,0.7)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+          <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <div id="wv-wrap">
+      <webview id="wv" src="https://chat.deepseek.com/a/chat" partition="persist:llm"></webview>
+
+      <!-- Settings overlay -->
+      <div id="settings">
+
+        <div class="s-section">
+          <h3>URL Profiles</h3>
+          <div id="profile-list"></div>
+          <div class="preset-chips" id="preset-chips">
+            <button class="preset-chip" data-name="ChatGPT"  data-url="https://chatgpt.com">ChatGPT</button>
+            <button class="preset-chip" data-name="Claude"   data-url="https://claude.ai">Claude</button>
+            <button class="preset-chip" data-name="Gemini"   data-url="https://gemini.google.com">Gemini</button>
+            <button class="preset-chip" data-name="DeepSeek" data-url="https://chat.deepseek.com">DeepSeek</button>
+            <button class="preset-chip" data-name="Qwen"     data-url="https://chat.qwen.ai">Qwen</button>
+            <button class="preset-chip" data-name="Kimi"     data-url="https://www.kimi.com/">Kimi</button>
+            <button class="preset-chip" data-name="MiniMax"  data-url="https://agent.minimax.io/">MiniMax</button>
+            <button class="preset-chip" data-name="StepFun"  data-url="https://stepfun.ai/chats/new">StepFun</button>
+          </div>
+          <div class="add-form">
+            <div class="s-row">
+              <label>Name</label>
+              <input id="new-name" class="s-inp" type="text" placeholder="e.g. DeepSeek" />
+            </div>
+            <div class="s-row">
+              <label>URL</label>
+              <input id="new-url" class="s-inp" type="text" placeholder="https://..." />
+            </div>
+            <button id="add-profile-btn" class="s-btn">+ Add Profile</button>
+          </div>
+        </div>
+
+        <hr class="s-divider" />
+
+        <div class="s-section">
+          <h3>Window Position &amp; Size</h3>
+          <div class="s-row">
+            <label>X</label>
+            <input id="win-x" class="s-inp" type="number" />
+            <span class="hint">px from left</span>
+          </div>
+          <div class="s-row">
+            <label>Y</label>
+            <input id="win-y" class="s-inp" type="number" />
+            <span class="hint">px from top</span>
+          </div>
+          <div class="s-row">
+            <label>Width</label>
+            <input id="win-width" class="s-inp" type="number" min="200" max="1400" />
+            <span class="hint">px</span>
+          </div>
+          <div class="s-row">
+            <label>Height</label>
+            <input id="win-height" class="s-inp" type="number" min="100" max="2400" />
+            <span class="hint">px</span>
+          </div>
+          <button id="save-size-btn" class="s-btn">Apply Position &amp; Size</button>
+        </div>
+
+        <hr class="s-divider" />
+
+        <div class="s-section">
+          <h3>Appearance</h3>
+          <div class="s-row">
+            <label>BG Color</label>
+            <input id="ui-color" type="color" class="color-inp" />
+            <span class="hint">background</span>
+          </div>
+          <div class="s-row">
+            <label>Opacity</label>
+            <input id="ui-opacity" type="range" min="5" max="98" step="1" class="s-slider" />
+            <span id="ui-opacity-val" class="val-lbl">72%</span>
+          </div>
+          <div class="s-row">
+            <label>Blur</label>
+            <input id="ui-blur" type="range" min="0" max="40" step="1" class="s-slider" />
+            <span id="ui-blur-val" class="val-lbl">18px</span>
+          </div>
+          <div class="s-row">
+            <label>Transparency</label>
+            <input id="transparency" type="range" min="0" max="90" step="1" class="s-slider" />
+            <span id="transparency-val" class="val-lbl">0%</span>
+          </div>
+          <div class="s-row">
+            <label>Accent</label>
+            <input id="ui-accent" type="color" class="color-inp" />
+            <span class="hint">buttons &amp; highlights</span>
+          </div>
+          <div id="theme-preview"></div>
+        </div>
+
+        <hr class="s-divider" />
+
+        <div class="s-section">
+          <h3>Keyboard Shortcut</h3>
+          <div class="s-row">
+            <label>Toggle</label>
+            <div id="shortcut-recorder" class="shortcut-inp" tabindex="0">Ctrl+H</div>
+            <button id="shortcut-clear" class="s-btn" style="padding:0 10px">✕</button>
+          </div>
+          <div class="s-row">
+            <label>Dock Left</label>
+            <div id="shortcut-dock-left" class="shortcut-inp" tabindex="0">—</div>
+            <button id="shortcut-dock-left-clear" class="s-btn" style="padding:0 10px">✕</button>
+          </div>
+          <div class="s-row">
+            <label>Dock Right</label>
+            <div id="shortcut-dock-right" class="shortcut-inp" tabindex="0">—</div>
+            <button id="shortcut-dock-right-clear" class="s-btn" style="padding:0 10px">✕</button>
+          </div>
+          <p class="hint">Klik kotak lalu tekan tombol atau kombinasi (contoh: F2, Ctrl+Shift+H).</p>
+          <div class="s-row" style="margin-top:2px">
+            <button id="save-shortcut-btn" class="s-btn">Apply Shortcut</button>
+            <span id="shortcut-status" class="hint" style="transition:opacity 0.4s;opacity:0;margin-left:8px"></span>
+          </div>
+        </div>
+
+        <hr class="s-divider" />
+        <button id="save-all-btn" class="s-btn">Save Settings</button>
+        <span id="save-status" class="hint" style="transition:opacity 0.4s;opacity:0"></span>
+        <hr class="s-divider" />
+        <span class="hint">Ctrl+H — show/hide &nbsp;·&nbsp; Esc — hide or close settings</span>
+
+      </div>
+    </div>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>
