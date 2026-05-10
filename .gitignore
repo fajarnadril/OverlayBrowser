@@ -3,3 +3,4 @@ dist/
 *.log
 .vscode/
 .DS_Store
+refreadme.md
