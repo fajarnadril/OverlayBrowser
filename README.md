@@ -53,7 +53,7 @@
 ## Overlay Browser — Floating UI for LLM Integration
 
 <p align="center">
-  <img src="https://github.com/fajarnadril/GitDrive-Storage/blob/main/overlaybrowserfeature2.png" alt="OverlayBrowser Feature Demo" width="800">
+  <img src="https://github.com/fajarnadril/GitDrive-Storage/blob/main/obfeatures.gif" alt="OverlayBrowser Feature Demo" width="800">
 </p>
 
 **OverlayBrowser is more than a simple browser.** It's a lightweight, proof-of-concept overlay tool designed for seamless LLM integration. Toggle a browser window instantly with global shortcuts, dock it conveniently, and persist profiles for quick access. Built with Electron for cross-platform compatibility.
