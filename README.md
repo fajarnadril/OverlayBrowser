@@ -388,7 +388,6 @@ If you find this project helpful, consider:
 
 **Have a question or suggestion?** [Open an issue](https://github.com/fajarnadril/OverlayBrowser/issues) or [start a discussion](https://github.com/fajarnadril/OverlayBrowser/discussions)
 
-Made with ❤️ by the community
 
 </div>
 
