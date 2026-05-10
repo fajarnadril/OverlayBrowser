@@ -64,35 +64,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     activeProfileName.textContent = match ? match.name : 'Custom';
   }
 
-  // ── Profile Dropdown ─────────────────────────────────────────
-  const profileDropdown = document.getElementById('profile-dropdown');
+  // ── Profile Panel ─────────────────────────────────────────
+  const profilePanel      = document.getElementById('profile-panel');
+  const profilePanelClose = document.getElementById('profile-panel-close');
+  const profilePickerList = document.getElementById('profile-picker-list');
 
-  function renderDropdown() {
-    profileDropdown.innerHTML = '';
+  function renderProfilePicker() {
+    profilePickerList.innerHTML = '';
     (profile.urlProfiles || []).forEach(p => {
       const item = document.createElement('div');
-      item.className = 'dd-item' + (p.url === profile.url ? ' active' : '');
-      item.textContent = p.name;
-      item.title = p.url;
+      item.className = 'p-item' + (p.url === profile.url ? ' active' : '');
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'p-name';
+      nameSpan.textContent = p.name;
+      const urlSpan = document.createElement('span');
+      urlSpan.className = 'p-url';
+      urlSpan.textContent = p.url;
+      item.appendChild(nameSpan);
+      item.appendChild(urlSpan);
       item.addEventListener('click', async () => {
-        profileDropdown.classList.remove('open');
+        profilePanel.classList.remove('open');
         if (p.url === profile.url) return;
         webview.src = p.url;
         profile = await window.electronAPI.saveProfile({ url: p.url });
         updateProfileLabel();
       });
-      profileDropdown.appendChild(item);
+      profilePickerList.appendChild(item);
     });
   }
 
-  activeProfileName.addEventListener('click', (e) => {
-    e.stopPropagation();
-    renderDropdown();
-    profileDropdown.classList.toggle('open');
+  document.getElementById('profile-btn').addEventListener('click', () => {
+    if (settingsPanel.classList.contains('open')) settingsPanel.classList.remove('open');
+    renderProfilePicker();
+    profilePanel.classList.toggle('open');
   });
 
-  document.addEventListener('click', () => {
-    profileDropdown.classList.remove('open');
+  profilePanelClose.addEventListener('click', () => {
+    profilePanel.classList.remove('open');
   });
 
   function applyUiTheme(theme) {
@@ -140,6 +148,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Escape') {
       if (settingsPanel.classList.contains('open')) {
         settingsPanel.classList.remove('open');
+      } else if (profilePanel.classList.contains('open')) {
+        profilePanel.classList.remove('open');
       } else {
         window.electronAPI.hideWindow();
       }

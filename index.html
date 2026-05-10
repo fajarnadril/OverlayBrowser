@@ -200,53 +200,46 @@
     .preset-chip:hover { background: var(--item-hover); }
     .preset-chip.exists { border-color: rgba(var(--accent-rgb), 0.4); color: rgba(var(--accent-rgb), 1); cursor: default; }
 
-    /* profile dropdown */
-    #profile-dropdown-wrap {
-      flex: 1; position: relative; min-width: 0; -webkit-app-region: no-drag;
+    /* profile button */
+    #profile-btn {
+      flex: 1; max-width: 110px; justify-content: flex-start; gap: 5px;
+      overflow: hidden; -webkit-app-region: no-drag;
     }
     #active-profile-name {
-      width: 100%; font-size: 11px; color: var(--text-secondary);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      padding: 2px 16px 2px 4px; cursor: pointer; border-radius: 5px;
-      position: relative; display: block;
-      transition: background 0.12s;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 11px;
     }
-    #active-profile-name:hover { background: var(--btn-hover); }
-    #active-profile-name::after {
-      content: '▾'; position: absolute; right: 3px; top: 50%;
-      transform: translateY(-50%); font-size: 9px;
-      color: var(--text-hint); pointer-events: none;
-    }
-    #profile-dropdown {
-      display: none; position: absolute; top: calc(100% + 4px); left: 0;
-      min-width: 160px; max-width: 240px;
+
+    /* profile panel overlay */
+    #profile-panel {
+      position: absolute; inset: 0; border-radius: 10px;
       background: var(--settings-bg);
-      border: 1px solid var(--border-input);
-      border-radius: 9px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-      z-index: 100; overflow: hidden;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+      overflow-y: auto; padding: 14px 14px 20px;
+      display: none; flex-direction: column; gap: 12px;
+      z-index: 10;
     }
-    #profile-dropdown.open { display: block; }
-    .dd-item {
-      padding: 7px 12px; font-size: 11px; cursor: pointer;
-      color: var(--text-primary); white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis;
-      transition: background 0.1s;
+    #profile-panel.open { display: flex; }
+    #profile-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
     }
-    .dd-item:hover { background: var(--item-hover); }
-    .dd-item.active { color: rgba(var(--accent-rgb), 1); background: rgba(var(--accent-rgb), 0.10); }
+    #profile-panel-header h3 {
+      margin: 0; font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
   </style>
 </head>
 <body>
   <div id="glass">
     <div id="toolbar">
       <img src="./chaticon.svg" width="18" height="18" draggable="false" style="opacity:0.75;flex-shrink:0;-webkit-app-region:no-drag;">
-      <div id="profile-dropdown-wrap">
+      <button id="profile-btn" class="btn" title="Switch profile">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
+          <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
         <span id="active-profile-name">DeepSeek</span>
-        <div id="profile-dropdown"></div>
-      </div>
+      </button>
       <button id="dock" class="btn icon" title="Toggle dock side">
         <svg id="dock-icon" width="13" height="13" viewBox="0 0 24 24" fill="none">
           <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/>
@@ -281,6 +274,15 @@
 
     <div id="wv-wrap">
       <webview id="wv" src="https://chat.deepseek.com/a/chat" partition="persist:llm"></webview>
+
+      <!-- Profile picker overlay -->
+      <div id="profile-panel">
+        <div id="profile-panel-header">
+          <h3>Select Profile</h3>
+          <button id="profile-panel-close" class="btn icon" title="Close">✕</button>
+        </div>
+        <div id="profile-picker-list"></div>
+      </div>
 
       <!-- Settings overlay -->
       <div id="settings">
