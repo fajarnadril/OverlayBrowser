@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="https://github.com/fajarnadril/GitDrive-Storage/blob/main/overlaybrowserbanner.png" alt="OverlayBrowser Banner" width="100%">
+  <img src="https://github.com/fajarnadril/GitDrive-Storage/blob/main/obbanner.png" alt="OverlayBrowser Banner" width="100%">
 </p>
 
 <p align="center">
