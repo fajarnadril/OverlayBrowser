@@ -141,6 +141,33 @@ function createWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+
+  // Auto-save window position & size on move/resize (debounced)
+  let saveTimeout;
+  const scheduleSaveBounds = () => {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      if (!mainWindow) return;
+      const { x, y, width, height } = mainWindow.getBounds();
+      profile.windowX = x;
+      profile.windowY = y;
+      profile.windowWidth = width;
+      profile.windowHeight = height;
+      saveProfileSync();
+    }, 300); // save after 300ms of inactivity
+  };
+  mainWindow.on("move", () => {
+    scheduleSaveBounds();
+    // Send real-time bounds to renderer
+    const bounds = mainWindow.getBounds();
+    mainWindow.webContents.send('window-bounds-changed', bounds);
+  });
+  mainWindow.on("resize", () => {
+    scheduleSaveBounds();
+    // Send real-time bounds to renderer
+    const bounds = mainWindow.getBounds();
+    mainWindow.webContents.send('window-bounds-changed', bounds);
+  });
 }
 
 let registeredShortcut = null;

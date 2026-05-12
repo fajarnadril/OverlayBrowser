@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateShortcut:    (k) => ipcRenderer.invoke('update-shortcut', k),
   setNativeTheme:    (t) => ipcRenderer.invoke('set-native-theme', t),
   updateDockShortcut:(key, val) => ipcRenderer.invoke('update-dock-shortcut', key, val),
+  onWindowBoundsChanged: (callback) => ipcRenderer.on('window-bounds-changed', (event, bounds) => callback(bounds)),
 });

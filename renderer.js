@@ -41,6 +41,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let profile = await window.electronAPI.loadProfile();
 
+  // Listen for real-time window bounds changes
+  window.electronAPI.onWindowBoundsChanged((bounds) => {
+    if (settingsPanel.classList.contains('open')) {
+      winXInput.value = bounds.x;
+      winYInput.value = bounds.y;
+      winWidthInput.value = bounds.width;
+      winHeightInput.value = bounds.height;
+    }
+  });
+
   // Seed default URL profiles if none exist
   if (!Array.isArray(profile.urlProfiles) || profile.urlProfiles.length === 0) {
     profile.urlProfiles = [
