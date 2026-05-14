@@ -95,7 +95,8 @@ function createFloatWindow() {
 }
 
 function hideMain() {
-  if (mainWindow) mainWindow.hide();
+  if (mainWindow) mainWindow.minimize();
+  if (!floatWindow) createFloatWindow();
   if (floatWindow) floatWindow.show();
 }
 
@@ -122,7 +123,7 @@ function createWindow() {
     y,
     icon: path.join(__dirname, "icon.png"),
     alwaysOnTop: true,
-    skipTaskbar: true,
+    skipTaskbar: false,
     resizable: true,
     frame: false,
     transparent: true,
@@ -132,6 +133,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true,
+      spellcheck: false,
     },
   });
 
@@ -144,6 +146,7 @@ function createWindow() {
 
   // Auto-save window position & size on move/resize (debounced)
   let saveTimeout;
+  let boundsThrottleTimeout;
   const scheduleSaveBounds = () => {
     if (saveTimeout) clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {
@@ -156,17 +159,21 @@ function createWindow() {
       saveProfileSync();
     }, 300); // save after 300ms of inactivity
   };
+  const sendBoundsThrottled = () => {
+    if (boundsThrottleTimeout) return;
+    boundsThrottleTimeout = setTimeout(() => {
+      boundsThrottleTimeout = null;
+      if (!mainWindow) return;
+      mainWindow.webContents.send('window-bounds-changed', mainWindow.getBounds());
+    }, 100); // max 10 updates/sec
+  };
   mainWindow.on("move", () => {
     scheduleSaveBounds();
-    // Send real-time bounds to renderer
-    const bounds = mainWindow.getBounds();
-    mainWindow.webContents.send('window-bounds-changed', bounds);
+    sendBoundsThrottled();
   });
   mainWindow.on("resize", () => {
     scheduleSaveBounds();
-    // Send real-time bounds to renderer
-    const bounds = mainWindow.getBounds();
-    mainWindow.webContents.send('window-bounds-changed', bounds);
+    sendBoundsThrottled();
   });
 }
 
@@ -180,7 +187,7 @@ function registerShortcut(key) {
   try {
     const ok = globalShortcut.register(key, () => {
       if (!mainWindow) return;
-      if (mainWindow.isVisible()) hideMain(); else showMain();
+      if (mainWindow.isVisible() && !mainWindow.isMinimized()) hideMain(); else showMain();
     });
     if (ok) registeredShortcut = key;
     else console.warn("Global shortcut registration failed:", key);
@@ -192,7 +199,7 @@ function registerShortcut(key) {
 app.whenReady().then(() => {
   loadProfileSync();
   createWindow();
-  createFloatWindow();
+  // floatWindow is created lazily on first hide
 
   registerShortcut(profile.shortcut || "Ctrl+H");
   registerDockShortcuts();
@@ -228,13 +235,38 @@ ipcMain.handle("hide-window", () => {
 });
 
 ipcMain.handle("show-from-float", () => {
-  showMain();
+  if (!mainWindow) return;
+  // Restore first so setBounds takes effect (minimized windows ignore setBounds on Windows)
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  const width  = Math.max(200, profile.windowWidth  || 420);
+  const height = Math.max(100, profile.windowHeight || 800);
+  mainWindow.setBounds({ x: profile.windowX, y: profile.windowY, width, height });
+  mainWindow.show();
+  mainWindow.focus();
+  if (floatWindow) floatWindow.hide();
 });
 
 ipcMain.handle("float-move-by", (event, dx, dy) => {
   if (!floatWindow) return;
-  const [x, y] = floatWindow.getPosition();
-  floatWindow.setPosition(x + Math.round(dx), y + Math.round(dy));
+  const [fx, fy] = floatWindow.getPosition();
+  const newFx = fx + Math.round(dx);
+  const newFy = fy + Math.round(dy);
+  floatWindow.setPosition(newFx, newFy);
+
+  // Compute and save target position for mainWindow.
+  // Cannot call setBounds() on a minimized window — apply on show instead.
+  const disp = screen.getPrimaryDisplay();
+  const wa = disp.workArea;
+  const width  = Math.max(200, profile.windowWidth  || 420);
+  const height = Math.max(100, profile.windowHeight || 800);
+  const fw = 64;
+  const screenMidX = wa.x + wa.width / 2;
+  const dockRight = (newFx + fw / 2) >= screenMidX;
+  const x = dockRight ? wa.x + wa.width - width : wa.x;
+  const y = Math.min(Math.max(newFy, wa.y), wa.y + wa.height - height);
+  profile.dockRight = dockRight;
+  profile.windowX = x;
+  profile.windowY = y;
 });
 
 ipcMain.handle("float-save-position", () => {
@@ -242,6 +274,7 @@ ipcMain.handle("float-save-position", () => {
   const [x, y] = floatWindow.getPosition();
   profile.floatX = x;
   profile.floatY = y;
+  // profile.windowX/Y already updated in float-move-by
   saveProfileSync();
 });
 
