@@ -64,14 +64,60 @@ function positionWindow(win) {
   const x = profile.windowX != null ? profile.windowX : (profile.dockRight ? wa.x + wa.width - width : wa.x);
   const y = profile.windowY != null ? profile.windowY : wa.y;
   win.setBounds({ x, y, width, height });
+  syncFloatToMain();
+}
+
+const FLOAT_W = 64;
+
+// Determine which corner of the screen the float button is in
+function getScreenCorner(fx, fy) {
+  const wa = screen.getPrimaryDisplay().workArea;
+  return {
+    right:  (fx + FLOAT_W / 2) >= wa.x + wa.width  / 2,
+    bottom: (fy + FLOAT_W / 2) >= wa.y + wa.height / 2,
+  };
+}
+
+// Float button position derived from browser bounds + stored corner preference
+function floatPosFromBrowser(bx, by, bw, bh) {
+  const right  = profile.floatCornerRight  !== false; // default: right
+  const bottom = profile.floatCornerBottom !== false; // default: bottom
+  return {
+    x: Math.round(right  ? bx + bw - FLOAT_W / 2 : bx - FLOAT_W / 2),
+    y: Math.round(bottom ? by + bh - FLOAT_W / 2 : by - FLOAT_W / 2),
+  };
+}
+
+// Browser top-left derived from float button position, using screen quadrant to detect corner
+function browserPosFromFloat(fx, fy, bw, bh) {
+  const { right, bottom } = getScreenCorner(fx, fy);
+  profile.floatCornerRight  = right;
+  profile.floatCornerBottom = bottom;
+  return {
+    x: Math.round(right  ? fx - bw + FLOAT_W / 2 : fx + FLOAT_W / 2),
+    y: Math.round(bottom ? fy - bh + FLOAT_W / 2 : fy + FLOAT_W / 2),
+  };
+}
+
+function syncFloatToMain() {
+  if (!floatWindow || !mainWindow) return;
+  const { x, y, width, height } = mainWindow.getBounds();
+  const fp = floatPosFromBrowser(x, y, width, height);
+  floatWindow.setPosition(fp.x, fp.y);
 }
 
 function createFloatWindow() {
   const disp = screen.getPrimaryDisplay();
   const wa = disp.workArea;
-  const fw = 64, fh = 64;
-  const x = profile.floatX != null ? profile.floatX : wa.x + wa.width - fw - 20;
-  const y = profile.floatY != null ? profile.floatY : wa.y + wa.height - fh - 20;
+  const fw = FLOAT_W, fh = FLOAT_W;
+  // Initial position: derived from browser bounds if available, else default bottom-right
+  let x = wa.x + wa.width - fw / 2;
+  let y = wa.y + wa.height - fh / 2;
+  if (mainWindow) {
+    const b = mainWindow.getBounds();
+    const fp = floatPosFromBrowser(b.x, b.y, b.width, b.height);
+    x = fp.x; y = fp.y;
+  }
 
   floatWindow = new BrowserWindow({
     width: fw, height: fh, x, y,
@@ -89,15 +135,16 @@ function createFloatWindow() {
   });
 
   floatWindow.loadFile(path.join(__dirname, "float-button.html"));
-  floatWindow.hide();
+  // Always visible at 'floating' level — main window sits above it at 'screen-saver' level
+  floatWindow.setAlwaysOnTop(true, 'floating');
+  floatWindow.show();
 
   floatWindow.on("closed", () => { floatWindow = null; });
 }
 
 function hideMain() {
   if (mainWindow) mainWindow.minimize();
-  if (!floatWindow) createFloatWindow();
-  if (floatWindow) floatWindow.show();
+  // float button is always visible — no need to show/hide it
 }
 
 function showMain() {
@@ -105,7 +152,7 @@ function showMain() {
   positionWindow(mainWindow);
   mainWindow.show();
   mainWindow.focus();
-  if (floatWindow) floatWindow.hide();
+  // float button stays visible underneath
 }
 
 function createWindow() {
@@ -138,6 +185,8 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, "index.html"));
+  // Main window at higher always-on-top level so it appears above the float button
+  mainWindow.setAlwaysOnTop(true, 'screen-saver');
   // mainWindow.webContents.openDevTools();
 
   mainWindow.on("closed", () => {
@@ -165,6 +214,7 @@ function createWindow() {
       boundsThrottleTimeout = null;
       if (!mainWindow) return;
       mainWindow.webContents.send('window-bounds-changed', mainWindow.getBounds());
+      syncFloatToMain();
     }, 100); // max 10 updates/sec
   };
   mainWindow.on("move", () => {
@@ -199,7 +249,7 @@ function registerShortcut(key) {
 app.whenReady().then(() => {
   loadProfileSync();
   createWindow();
-  // floatWindow is created lazily on first hide
+  createFloatWindow(); // always visible as persistent floating button
 
   registerShortcut(profile.shortcut || "Ctrl+H");
   registerDockShortcuts();
@@ -236,14 +286,26 @@ ipcMain.handle("hide-window", () => {
 
 ipcMain.handle("show-from-float", () => {
   if (!mainWindow) return;
-  // Restore first so setBounds takes effect (minimized windows ignore setBounds on Windows)
+  // Toggle: if browser is visible, hide it; otherwise show it
+  if (mainWindow.isVisible() && !mainWindow.isMinimized()) {
+    hideMain();
+    return;
+  }
   if (mainWindow.isMinimized()) mainWindow.restore();
   const width  = Math.max(200, profile.windowWidth  || 420);
   const height = Math.max(100, profile.windowHeight || 800);
+  // Compute browser position from current float button position
+  if (floatWindow) {
+    const [fx, fy] = floatWindow.getPosition();
+    const disp = screen.getPrimaryDisplay();
+    const wa = disp.workArea;
+    const bp = browserPosFromFloat(fx, fy, width, height);
+    profile.windowX = Math.min(Math.max(bp.x, wa.x), wa.x + wa.width - width);
+    profile.windowY = Math.min(Math.max(bp.y, wa.y), wa.y + wa.height - height);
+  }
   mainWindow.setBounds({ x: profile.windowX, y: profile.windowY, width, height });
   mainWindow.show();
   mainWindow.focus();
-  if (floatWindow) floatWindow.hide();
 });
 
 ipcMain.handle("float-move-by", (event, dx, dy) => {
@@ -253,28 +315,18 @@ ipcMain.handle("float-move-by", (event, dx, dy) => {
   const newFy = fy + Math.round(dy);
   floatWindow.setPosition(newFx, newFy);
 
-  // Compute and save target position for mainWindow.
-  // Cannot call setBounds() on a minimized window — apply on show instead.
-  const disp = screen.getPrimaryDisplay();
-  const wa = disp.workArea;
+  // Derive browser position from new float position and save to profile
   const width  = Math.max(200, profile.windowWidth  || 420);
   const height = Math.max(100, profile.windowHeight || 800);
-  const fw = 64;
-  const screenMidX = wa.x + wa.width / 2;
-  const dockRight = (newFx + fw / 2) >= screenMidX;
-  const x = dockRight ? wa.x + wa.width - width : wa.x;
-  const y = Math.min(Math.max(newFy, wa.y), wa.y + wa.height - height);
-  profile.dockRight = dockRight;
-  profile.windowX = x;
-  profile.windowY = y;
+  const disp = screen.getPrimaryDisplay();
+  const wa = disp.workArea;
+  const bp = browserPosFromFloat(newFx, newFy, width, height);
+  profile.windowX = Math.min(Math.max(bp.x, wa.x), wa.x + wa.width - width);
+  profile.windowY = Math.min(Math.max(bp.y, wa.y), wa.y + wa.height - height);
 });
 
 ipcMain.handle("float-save-position", () => {
-  if (!floatWindow) return;
-  const [x, y] = floatWindow.getPosition();
-  profile.floatX = x;
-  profile.floatY = y;
-  // profile.windowX/Y already updated in float-move-by
+  // Browser position already saved in profile via float-move-by
   saveProfileSync();
 });
 
