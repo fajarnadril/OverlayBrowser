@@ -1,6 +1,6 @@
 {
   "name": "overlay-browser-for-your-favorite-llm",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Overlay browser with global shortcut, profile persistence, draggable float button, and taskbar support (Electron)",
   "main": "main.js",
   "scripts": {
